@@ -5,6 +5,8 @@ __pycache__/
 
 #pycharm
 .idea/
+imgs/
+*.png
 
 # C extensions
 *.so
