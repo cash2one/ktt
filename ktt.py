@@ -67,6 +67,7 @@ def test_start():
             ktt.post_register(sms_captcha)
             time.sleep(3)
             ktt.get_user_info()
+            return mobile_num
     yi_ma.release_all()
 
 
@@ -182,6 +183,8 @@ def test_urllib():
     print(url_str)
 
 urls = {
+    "getlist2": "http://api.applezhuan.com/api/c/getlist?&s=T%2BMxP9B%2B58ZCpjoEd4ix4ZKaluQn1F2Vpvex%2BVohxJBIjop7GQeE9cW2LUoz%2FZguHT23ObPb2ig8tnYHBrblQppKl%2BiN%2FS0rJAzVbfX7qFYg2op%2Fv51OdFWPybHCok949XSwxgJN8eCjSH9RIcQ2NVaEkAEeu8MlNlgU0ztqoMsOCs1r2a9dVq8jcWwoENFnU3UQgjhVD0R2yjoMGc84j%2FK0gDZwPe5ND8EgMqb97SdMlpWq3Bkx4WF2qw%2FhOaVUz8pdFOtdxgMiqfbxwc%2FWamjUTvpqigwDzlZeEwITPi41Vl2TLHPmvAVMIYqg9tsFo2bfmQUHWkBvKs0x1vdIvIxqbPp0uA7rgtPjL3rzSHg%3D",
+    "update_user": "http://api.applezhuan.com/api/c/update_user_info?&s=FTDTHHO4wIdoUWgVDI3uy3qspq4XrHXwkitUItPuNniSYfKhsorJnIw6VsVh56f7er9Zji0TjgeSao411kaT9NKCqWNw9Q5hHvyng58wAYg%3D",
     "aos_update_info": "http://api.applezhuan.com/api/c/aos_update_info?&s=07O%2FBYg6m3tt%2BnIk"
                        "%2BRkuGzFnsiNrEFrL0RqJddjNaSM%3D",
     "start": "http://api.applezhuan.com/api/c/start?&s=n0KnW61PXUYeu%2BfH6yjf9wq30TMtcfkhCLN70CU1W"
@@ -227,6 +230,15 @@ urls = {
                   "%2Fcy0Eh%2B%2BaQXsBXfqyhG53jn5QB6LLrWRjm2LtXPf8GE%2B3nTD23by3wzEsxEun6e89I2kwiWK9wBECphbaMusWRZkN"
                   "%2FFF0ApcCW7BIm4y0BlRrHiiemqSIV4"
                   "%2FbBoTVcoXD4RFIlav3SdJZCEtMyrvaQwKcIZTA7F8ldev0kkWhNePNsXQhcMcllcpljvJVa7HJFU1rZQCOZHfqqdB3q5UVXNkTOSnCjHYv2kfh2uk%2Bm%2F8msJ1xL5ow%3D",
+
+    "login_post1": "http://api.applezhuan.com/api/c/login?&s=BP%2FJ3EgrIBweBzOP6scfli7kQWt8Qg1zaPrnuGIdn"
+                   "%2B8gyaBFoojT9dg8fM8C9rZ%2F1Z3sqUNCZoKW1VnMZVxeaiSsvnXXY6mS8rzs%2FFkvMBXWjbdwbX"
+                   "%2F1m9tLhWbrBD2PfIwmqm7FoX%2F51f5y9i8VpyPOUxjO2pMWY"
+                   "%2FUwqjXdrsPnFQp2bn87RoCxo0n5Ls1GNL2pfxG250GYpwdm2v%2Fhh3p%2B9G8l%2Ft0gDr"
+                   "%2FYMMfLetjZeoSwDV2EXti5VpVpecT708Ym2zVFVHpqYiY1xPSl7VWL78fJLQtU6LZtABP4550BIY"
+                   "%2FlTZUthrpecC3e9PNo9W0URaMpdB3avpFusu"
+                   "%2BBaMyM2MmxJvGQ3FJOyu42K47L2xsczSBcdXx4NkKYPzTfSpMGxWdKMHOTLiHhoj4%2Bdg%2FtOIoZMWJHfDdNkDxomPc"
+                   "%3D",
     "register_post": "http://api.applezhuan.com/api/c/register?&s=OwBjPvLckT4biOj%2Br3j8KSXu67DrVYjG7"
                      "%2BenFspMJKPIZgDwh10K2f%2BylDHgQxWxfasmNy9Oh5aW2FPq%2F5cekX%2FPFPa9%2FgQIrn6puv1"
                      "%2FTyiRpHvlGfA8umOCyuB3IKv%2FAD1oEQhrDDm8pjLvCef2d8EW00z3E"
@@ -246,14 +258,117 @@ urls = {
 }
 
 
-def main():
-    # test_start()
-    # test_show_default_channel_list()
-    test_decrypt_one("get_content")
-    # test_decrypt_one("get_user_info1")
+def test_run(mobile_num="17184084074"):
+    # mobile_num =
+    mobile = Mobile(mobile_num)
+    ktt = KTT(mobile)
+    # 0. get cookie
+    ktt.gen_device_code()
+    ktt.get_api_start()
+    # 1. login
+    time.sleep(3)
+    ktt.post_login()
+    # 2. get_user_info
+    time.sleep(3)
+    ktt.get_user_info()
+    print(ktt.user_info)
+    # 3. get_task_center
+    print("task_status:")
+    time.sleep(3)
+    task_center_status = ktt.post_task_center_status()
+    print("task_center_status")
+    print(task_center_status)
+    if task_center_status["new_task_status"] == 0:
+        time.sleep(3)
+        task_status = ktt.get_task_status()
+        print(task_status["status"])
+        if task_status["status"][0] == 0:
+            time.sleep(3)
+            new_task_result = ktt.post_task_commit_new()
+            print("new_task_result:")
+            print(new_task_result)
 
+    if task_center_status["invite_task_status"] == 0:
+        time.sleep(3)
+        ktt.post_task_commit_invite("20833")
+    # 4. sign
+    print("task sign")
+    time.sleep(3)
+    is_sign = ktt.get_sign_status()
+    if is_sign == 0:
+        time.sleep(3)
+        ktt.get_sign()
+    else:
+        print("has signed")
+    # 5. packet
+    print("packet")
+    time.sleep(3)
+    count_down = ktt.get_timing_packet()
+    print("count_down: %d" % count_down)
+    if count_down == 0:
+        time.sleep(3)
+        ktt.post_packet()
+    # 6. get list
+
+    time.sleep(3)
+    art_list = ktt.get_list()
+    while art_list["total"] == 0:
+        time.sleep(3)
+        art_list = ktt.get_list()
+    print("art total: %d" % art_list["total"])
+    print("art len: %d" % art_list["num"])
+    print(art_list["list"][0])
+    print(art_list["list"][0]["id"])
+    art_id = art_list["list"][0]["id"]
+    # 7. get content
+    print("get content")
+    time.sleep(3)
+    res_data = ktt.get_content(art_id)
+    print(res_data)
+    time.sleep(1)
+    res_data = ktt.get_content_by_id(art_id)
+    print(res_data)
+
+    # 8. get reward
+    print("get reward")
+    time.sleep(3)
+    res_data = ktt.get_article_reward(art_id)
+    print(res_data)
+    print("hello")
+
+def test_update_user():
+    token = "eyJhbGciOiJIUzI1NiIsImV4cCI6MTQ5MzU0MTE4NCwiaWF0IjoxNDkwOTQ5MTg0fQ.eyJpYXQiOjE0OTA5NDkxODQsInVpZCI6MjY0NjN9.RYKPgvX_3MDEBKqifLpG3bo7kLoTwy0G1DlceigfwtA"
+    # session = ""
+    # lon=0.0&time=1490976061&vn=1.0.2&mac=24:00:ba:75:3d:91&cid=1&content_type=1,3,4,5&av=2&
+    # network=WIFI&platform=2&brand=HONOR&device_code=0000000076f574c7fffffffff6e65fd7&
+    # ov=5.1.1&device_name=huawei&page=1&lat=0.0&android_id=HONORKIW-TL00H
+    mobile = Mobile("13288250180")
+    mobile.mac = "24:00:ba:75:3d:91"
+    mobile.brand = "HONOR"
+    mobile.ov = "5.1.1"
+    mobile.android_id = "HONORKIW-TL00H"
+    mobile.device_name = "huawei"
+    ktt = KTT(mobile)
+    ktt.device_code = "0000000076f574c7fffffffff6e65fd7"
+    ktt.get_api_start()
+    ktt.token = token
+    ktt.cookie += token
+
+    ktt.post_update_user_info()
+
+
+def main():
+    # mobile_num = test_start()
+    # test_show_default_channel_list()
+    # test_decrypt_one("getlist2")
+    # test_decrypt_one("update_user")
+    # print("mobile_num: %s" % mobile_num)
+    # time.sleep(20)
+    # if mobile_num:
+    test_run()
     # test_show_guest_info()
     # test_orc()
+    # test_update_user()
 
 if "__main__" == __name__:
     main()
