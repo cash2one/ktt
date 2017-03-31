@@ -8,6 +8,8 @@ import random
 import requests
 import time
 import json
+import pytesseract
+from PIL import Image, ImageDraw
 
 
 #
@@ -72,7 +74,9 @@ class KTT(object):
         self.encrypt = Encrypt()
         mobile.get_mobile_info()
         self.cookie = ""
+        self.token = ""
         self.guest_info = {}
+        self.user_info = {}
         self.channel_list = [
             {u'id': 1, u'name': u'\u63a8\u8350'}, {u'id': 3, u'name': u'\u5a31\u4e50'},
             {u'id': 5, u'name': u'\u641e\u7b11'}, {u'id': 6, u'name': u'\u7f8e\u5973'},
@@ -228,10 +232,9 @@ class KTT(object):
     def get_img_captcha(self):
         """Get captcha image
             
-        :return: 
+        :return: code or None
         """
         url = "http://api.applezhuan.com/api/c/get_img_captcha?&"
-        #params: device_code = ffffffff97dca561ffffffffd3fdff87 & time = 1490192048 & ov = 4.4.2
         params = {
             "time": self.get_current_time,
             "ov": self.mobile.os,
@@ -253,21 +256,425 @@ class KTT(object):
         result = json.loads(res.text)
         #print(result["d"])
         img_str = result["d"]["data"]
+        img_ts = result["d"]["ts"]
         index_comma = img_str.index(",")
         img_str = img_str[index_comma+1:]
-        return base64.decodestring(img_str.encode())
-        #print(img_str)
-        # path = "tmp.png"
-        # decode_png = base64.decodestring(img_str.encode())
-        # with open(path, "wb") as f:
-        #     f.write(decode_png)
+        # img_str = base64.decodestring(img_str.encode())
+        # print(img_str)
+        path = "tmp.png"
+        decode_png = base64.decodestring(img_str.encode())
+        with open(path, "wb") as f:
+             f.write(decode_png)
 
+        image = Image.open("tmp.png")
+        draw = ImageDraw.Draw(image)
+        white_color = (255, 255, 255)
+        for x in range(0, image.size[0]):
+            for y in range(0, image.size[1]):
+                color = image.getpixel((x, y))
+                if color[2] == 0:
+                    draw.point((x, y), white_color)
+        code = pytesseract.image_to_string(image, lang="ktt")
+        code = code.replace("|", "l")
+        # image.save("tifs/%s_code.tif" % code)
+        if len(code) == 4:
+            return img_ts, code
+        else:
+            return img_ts, None
+
+    def get_sms_captcha(self, img_ts, img_captcha):
+        """
+            accept the img captcha and request send sms captcha
+        :return: 
+        """
+        url = "http://api.applezhuan.com/api/get_sms_captcha?&"
+        params = {
+            "img_captcha": img_captcha,
+            "time": self.get_current_time,
+            "ts": img_ts,
+            "device_code": self.device_code,
+            "mobile": self.mobile.mobile
+        }
+        params_str = self.encrypt.get_secret_param(params)
+        url = url + "s=" + params_str
+        headers = {
+            "Accept-Language": "zh-CN,zh;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "Host": "api.applezhuan.com",
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "Cookie": self.cookie
+        }
+
+        res = requests.get(url, headers=headers)
+        # print(res.text)
+        result = json.loads(res.text)
+        return result
+
+
+    def post_register(self, sms_captcha):
+        """
+            register a user
+        :return: 
+        """
+        url = "http://api.applezhuan.com/api/c/register"
+        params = {
+            "android_id": self.mobile.android_id,
+            "platform": "2",
+            "password": "123456",
+            "av": "2",
+            "cne": "0",
+            "time": self.get_current_time,
+            "ov": self.mobile.os,
+            "lon": self.mobile.lon,
+            "lat": self.mobile.lat,
+            "device_name": "dpi",
+            "device_code": self.device_code,
+            "brand": self.mobile.brand,
+            "mac": self.mobile.mac,
+            "vn": "1.0.2",
+            "father": "0",
+            "mobile": self.mobile.mobile,
+            "captcha": sms_captcha,
+            "network": self.mobile.network
+        }
+        params_str = self.encrypt.get_secret_param(params)
+        post_data = {
+            "s": params_str
+        }
+
+        headers = {
+            "Accept-Language": "zh-CN,zh;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "Host": "api.applezhuan.com",
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "Cookie": self.cookie
+        }
+
+        res = requests.post(url, headers=headers, data=post_data)
+        print(res.text)
+        result = json.loads(res.text)
+        uid = result["d"]["uid"]
+        self.token = result["d"]["token"]
+        self.cookie += self.token
+
+    def get_user_info(self):
+        """ Get user info
+        Set self.user_info
+        :return: 
+        """
+        url = "http://api.applezhuan.com/api/c/get_userinfo?&"
+        params = {
+            "android_id": self.mobile.android_id,
+            "platform": "2",
+            "av": "2",
+            "token": self.token,
+            "time": self.get_current_time,
+            "ov": self.mobile.os,
+            "lon": self.mobile.lon,
+            "lat": self.mobile.lat,
+            "device_name": "dpi",
+            "device_code": self.device_code,
+            "brand": self.mobile.brand,
+            "mac": self.mobile.mac,
+            "vn": "1.0.2",
+            "network": self.mobile.network
+        }
+        params_str = self.encrypt.get_secret_param(params)
+        url = url + "s=" + params_str
+        headers = {
+            "Accept-Language": "zh-CN,zh;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "Host": "api.applezhuan.com",
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "Cookie": self.cookie
+        }
+
+        res = requests.get(url, headers=headers)
+        # print(res.text)
+        result = json.loads(res.text)
+        print(result)
+        self.user_info = result["d"]
+        self.user_info.pop("h5_url")
+        self.user_info.pop("banner")
+        self.user_info.pop("menu")
+        self.user_info.pop("headimg")
+        self.user_info.pop("token")
+
+    def post_task_commit_invite(self, father):
+        """
+        input the invite code
+        :return: 
+        """
+        url = "http://api.applezhuan.com/api/m/task_commit_invite"
+        headers = {
+            "Host": "api.applezhuan.com",
+            "Connection": "keep-alive",
+            "Accept": "application/json",
+            "Origin": "http://m.applezhuan.com",
+            "Content-Type":  "application/x-www-form-urlencoded",
+            "Referer":  "http://m.applezhuan.com/task_invite_num.html",
+            "Accept-Encoding":  "gzip,deflate",
+            "Accept-Language":  "zh-CN,en-US;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "Cookie": self.cookie,
+            "X-Requested-With": "com.shuishi.kuai"
+        }
+
+        post_data = {
+            "father": father
+        }
+        res = requests.post(url, headers=headers, data=post_data)
+        result = json.loads(res.text)
+        print("get money: %s" % result["d"]["money"])
+
+    def get_task_status(self):
+        """
+            get task status
+        :return: 
+        """
+        url = "http://api.applezhuan.com/api/m/task_status?id=33"
+        headers = {
+            "Host": "api.applezhuan.com",
+            "Connection": "keep-alive",
+            "Accept": "application/json",
+            "Origin": "http://m.applezhuan.com",
+            "Content-Type":  "application/x-www-form-urlencoded",
+            "Referer":  "http://m.applezhuan.com/task_new.html",
+            "Accept-Encoding":  "gzip,deflate",
+            "Accept-Language":  "zh-CN,en-US;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "Cookie": self.cookie,
+            "X-Requested-With": "com.shuishi.kuai"
+        }
+
+        res = requests.get(url, headers=headers, data=post_data)
+        result = json.loads(res.text)
+        return result
+        #print("get money: %s" % result["d"]["money"])
+
+    def post_task_commit_new(self):
+        """
+            newer task
+        :return: 
+        """
+        url = "http://api.applezhuan.com/api/m/task_commit"
+        headers = {
+            "Host": "api.applezhuan.com",
+            "Connection": "keep-alive",
+            "Accept": "application/json",
+            "Origin": "http://m.applezhuan.com",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": "http://m.applezhuan.com/task_invite_num.html",
+            "Accept-Encoding": "gzip,deflate",
+            "Accept-Language": "zh-CN,en-US;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "Cookie": self.cookie,
+            "X-Requested-With": "com.shuishi.kuai"
+
+        }
+
+        post_data = {
+            "id": 33
+        }
+        res = requests.post(url, headers=headers, data=post_data)
+        result = json.loads(res.text)
+        print("post new task result: ")
+        print(result)
+
+    def post_task_center_status(self):
+            """
+                newer task
+            :return: 
+            """
+            url = "http://api.applezhuan.com/api/m/task_center_status"
+            headers = {
+                "Host": "api.applezhuan.com",
+                "Connection": "keep-alive",
+                "Accept": "application/json",
+                "Origin": "http://m.applezhuan.com",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": "http://m.applezhuan.com/task_center.html",
+                "Accept-Encoding": "gzip,deflate",
+                "Accept-Language": "zh-CN,en-US;q=0.8",
+                "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+                "Cookie": self.cookie,
+                "X-Requested-With": "com.shuishi.kuai"
+            }
+
+
+            res = requests.post(url, headers=headers)
+            result = json.loads(res.text)
+            print("post new task result:")
+            print(result)
+
+
+
+    def get_list(self):
+        """
+         get content list
+        :return: 
+        """
+        url = "http://api.applezhuan.com/api/c/getlist?&"
+        # platform=2&
+        # ov=4.4.2&
+        # lon=116.3876&
+        # device_code=ffffffff97dca561ffffffffd3fdff87&
+        # mac=DF:CE:F4:31:BF:42&
+        # cid=1&
+        # vn=1.0.2&
+        # av=2&
+        # network=WIFI&
+        # android_id=KOT49H&
+        # time=1490191996&
+        # device_name=dpi&
+        # page=1&
+        # brand=samsung&
+        # content_type=1,3,4,5&
+        # lat=39.9065
+        cid = random.randint(0, len(self.channel_list)-1)
+        params = {
+            "android_id": self.mobile.android_id,
+            "platform": "2",
+            "av": "2",
+            "cid": cid,
+            "page": "1",
+            "time": self.get_current_time,
+            "ov": self.mobile.os,
+            "lon": self.mobile.lon,
+            "lat": self.mobile.lat,
+            "device_name": "dpi",
+            "device_code": self.device_code,
+            "brand": self.mobile.brand,
+            "mac": self.mobile.mac,
+            "vn": "1.0.2",
+            "content_type": "1, 3, 4, 5",
+            "network": self.mobile.network
+        }
+        params_str = self.encrypt.get_secret_param(params)
+        url = url + "s=" + params_str
+        headers = {
+            "Accept-Language": "zh-CN,zh;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "Host": "api.applezhuan.com",
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "Cookie": self.cookie
+        }
+
+        res = requests.get(url, headers=headers)
+        result = json.loads(res.text)
+        print(result)
+
+    def get_content(self, content_id):
+        """
+            get content by id
+        :return: 
+        """
+        url = "http://api.applezhuan.com/api/c/get_content?&"
+        # android_id=KOT49H&
+        # platform=2&
+        # time=1490192337&
+        # ov=4.4.2&
+        # content_id=32741&
+        # device_name=dpi&
+        # device_code=ffffffff97dca561ffffffffd3fdff87&
+        # brand=samsung&
+        # mac=DF:CE:F4:31:BF:42&
+        # vn=1.0.2&
+        # av=2&
+        # network=WIFI
+        params = {
+            "android_id": self.mobile.android_id,
+            "platform": "2",
+            "av": "2",
+            "content_id": content_id,
+            "time": self.get_current_time,
+            "ov": self.mobile.os,
+            "device_name": "dpi",
+            "device_code": self.device_code,
+            "brand": self.mobile.brand,
+            "mac": self.mobile.mac,
+            "vn": "1.0.2",
+            "network": self.mobile.network
+        }
+        params_str = self.encrypt.get_secret_param(params)
+        url = url + "s=" + params_str
+        headers = {
+            "Accept-Language": "zh-CN,zh;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "Host": "api.applezhuan.com",
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "Cookie": self.cookie
+        }
+
+        res = requests.get(url, headers=headers)
+        result = json.loads(res.text)
+        print("get content id= %s" % content_id)
+        print(result)
+
+    def get_content_id(self, content_id):
+        """
+            get content info by id
+        :return: 
+        """
+        url = "http://api.applezhuan.com/api/m/get_content?content_id=%s" % content_id
+        headers = {
+            "Host": "api.applezhuan.com",
+            "Connection": "keep-alive",
+            "Accept": "application/json",
+            "Origin": "http://m.applezhuan.com",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": "http://m.applezhuan.com/article_detail.html?content_id=%s" % content_id,
+            "Accept-Encoding": "gzip,deflate",
+            "Accept-Language": "zh-CN,en-US;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "Cookie": self.cookie,
+            "X-Requested-With": "com.shuishi.kuai"
+        }
+
+        res = requests.get(url, headers=headers)
+        result = json.loads(res.text)
+        print("get content id")
+        print(result)
+
+    def get_article_reward(self, content_id):
+        """
+            get article reward
+        :return: 
+        """
+        url = "http://api.applezhuan.com/api/m/article_get_reward"
+        headers = {
+            "Host": "api.applezhuan.com",
+            "Connection": "keep-alive",
+            "Accept": "application/json",
+            "Origin": "http://m.applezhuan.com",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": "http://m.applezhuan.com/article_detail.html?content_id=%s" % content_id,
+            "Accept-Encoding": "gzip,deflate",
+            "Accept-Language": "zh-CN,en-US;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "Cookie": self.cookie,
+            "X-Requested-With": "com.shuishi.kuai"
+        }
+
+        post_data = {
+            "content_id": content_id
+        }
+        res = requests.post(url, headers=headers, data=post_data)
+        result = json.loads(res.text)
+        print("get article reward:")
+        print(result)
 
 
 
 def pad(s):
     """Padding s to 16bits."""
     return s + (16 - len(s) % 16) * chr(16 - len(s) % 16)
+
 
 def un_pad(s):
     """Delete padding from s to original s"""
@@ -302,7 +709,7 @@ class Mobile(object):
 
     os_versions = ["4.4.2", "4.4.5", "5.0", "5.1", "6.0", "7.0"]
 
-    def __init__(self, mobile=""):
+    def __init__(self, mobile="18844196047"):
         self.mobile = mobile
         self.lon = 116
         self.lat = 40

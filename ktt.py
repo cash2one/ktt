@@ -1,10 +1,11 @@
-import time
+import sys
 
 from KuaiTT import Mobile, KTT, StrUtil, Encrypt, Decrypt
+from yima import YIMA
 import urllib
 import pytesseract
 from PIL import Image, ImageDraw
-
+import time
 
 def test_device_code():
     mobile = Mobile()
@@ -14,27 +15,71 @@ def test_device_code():
 
 
 def test_start():
-    mobile = Mobile()
-    ktt = KTT(mobile)
-    ktt.gen_device_code()
-    ktt.get_api_start()
-    print("cookie: {}".format(ktt.cookie))
+
+    yi_ma = YIMA("6381")
+    yi_ma.login_yi_ma()
+    # 1. get mobile
+    time.sleep(3)
+    mobile_num = yi_ma.get_mobile()
+    mobile = Mobile(mobile_num)
+    print("mobile: %s" % mobile_num)
+    if mobile:
+        ktt = KTT(mobile)
+        ktt.gen_device_code()
+        ktt.get_api_start()
+        print("cookie: {}".format(ktt.cookie))
     # get channel list
     # channel_list = ktt.get_api_default_channel_list()
     # print(channel_list)
     # get guest info
     # ktt.get_guest_info()
-    for i in range(1, 21):
-        time.sleep(3)
-        decode_png = ktt.get_img_captcha()
-        path = "imgs/%d.png"% i
-        print(path)
-        with open(path, "wb") as f:
-            f.write(decode_png)
+
+    # for i in range(6, 20):
+    #     time.sleep(3)
+    #     decode_png = ktt.get_img_captcha()
+    #     path = "imgs/%d.png"% i
+    #     print(path)
+    #     with open(path, "wb") as f:
+    #         f.write(decode_png)
+
+    # get sms captcha
+        status = "-1113"
+        while status == "-1113":
+            img_captcha = None
+            while img_captcha is None:
+                img_ts, img_captcha = ktt.get_img_captcha()
+                print("img_ts: %s, img_captcha: %s" % (img_ts, img_captcha))
+                time.sleep(3)
+            result = ktt.get_sms_captcha(img_ts, img_captcha)
+            status = str(result["c"])
+            print("status: %s" % status)
+            if status == "-1113":
+                time.sleep(60)
+
+        if status == "-2043":
+            print("exit mobile exists")
+            sys.exit(0)
+        if status == "0":
+            time.sleep(5)
+            sms_captcha = yi_ma.get_code()
+            print("sms_captcha: %s" % sms_captcha)
+            time.sleep(3)
+            ktt.post_register(sms_captcha)
+            time.sleep(3)
+            ktt.get_user_info()
+    yi_ma.release_all()
+
+
+
+    # 0 normal
+    # -2043 mobile exists
+    # -1113 pic code error
+
+    # print("sms result: %s" % result)
 
 
 def test_orc():
-    for i in range(0, 21):
+    for i in range(0, 20):
         image = Image.open("imgs/%d.png"% i)
         draw = ImageDraw.Draw(image)
         white_color = (255, 255, 255)
@@ -43,8 +88,8 @@ def test_orc():
                 color = image.getpixel((x, y))
                 if color[2] == 0:
                     draw.point((x, y), white_color)
-        image.save("imgs/%d%d.png"%(i,i))
-        code = pytesseract.image_to_string(image)
+        image.save("tifs/%d%d.tif"%(i,i))
+        code = pytesseract.image_to_string(image, lang="ktt")
         print("%d code: %s"% (i,code))
 
 
@@ -55,8 +100,9 @@ def test_show_default_channel_list():
     for channel in c_list:
         id = channel["id"]
         name = channel["name"]
-        print("id : %d, name: %s"% (id, name))
+        print("id : %d, name: %s" % (id, name))
     print("*"*50)
+
 
 def test_show_guest_info():
     """
@@ -203,10 +249,11 @@ urls = {
 def main():
     # test_start()
     # test_show_default_channel_list()
-    # test_decrypt_one("get_img_captcha")
+    test_decrypt_one("get_content")
+    # test_decrypt_one("get_user_info1")
 
     # test_show_guest_info()
-    test_orc()
+    # test_orc()
 
 if "__main__" == __name__:
     main()
