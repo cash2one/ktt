@@ -12,12 +12,12 @@ class YIMA:
             args:
                 item_id (2730 (zx), 2674(qtt), 6381(ktt))
         """
-        self.url='http://api.51ym.me/UserInterface.aspx'
+        self.url = 'http://api.51ym.me/UserInterface.aspx'
         self.token = ""
         self.item_id = item_id
         self.mobile = ""
         self.headers = {
-            "Content-Type":"text/plain;charset:utf8;"
+            "Content-Type": "text/plain;charset:utf8;"
         }
         
     def login_yi_ma(self):
@@ -71,43 +71,49 @@ class YIMA:
                 message
         """
         print ("get message.")
-        body={
+        body = {
             'action': 'getsms',
             'mobile': self.mobile,
             'itemid': self.item_id,
             'token': self.token
         }
         sms = "3001"
-        while sms == '3001':
+        total_count = 0
+        while sms == '3001' and total_count < 10:
             r = requests.get(self.url, params=body)
             # print("encoding: %s" % r.apparent_encoding)
             sms = r.content.decode("utf-8").encode("utf-8")
             print ("message:%s" % sms)
+            total_count += 1
             time.sleep(5)
-        sms=sms.split('|')[1]
-        return sms
+        if total_count < 10:
+            sms = sms.split('|')[1]
+            return sms
+        else:
+            return None
         
     def get_code(self):
         """
         get the sms code
-        :return: 
+        :return: sms string
         """
         sms = self.get_message()
-        # sms = sms.encode("utf-8")
-        # sms = "【快头条】验证码5458，您正在注册成为快头条用户，感谢您的支持！"
-        # print (sms)
-        if self.item_id == "2730":
-            begin = sms.find(':')+1
-            end = sms.find(',')
-            code = sms[begin:end]
-            return code
-        elif self.item_id == "2674":
-            index = sms.find("。")
-            return sms[index-4:index]
-        elif self.item_id == "6381":
-            index = sms.index("，")
-            # print("index: %d" % index)
-            return sms[index-4:index]
+        if sms:
+            if self.item_id == "2730":
+                begin = sms.find(':')+1
+                end = sms.find(',')
+                code = sms[begin:end]
+                return code
+            elif self.item_id == "2674":
+                index = sms.find("。")
+                return sms[index-4:index]
+            elif self.item_id == "6381":
+                index = sms.index("，")
+                # print("index: %d" % index)
+                return sms[index-4:index]
+        else:
+            return None
+
 
 def main():
     sms = u"【快头条】验证码2149，您正在注册成为快头条用户，感谢您的支持！"

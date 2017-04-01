@@ -1,9 +1,11 @@
 # -*- coding:utf-8 -*-
 #
 import base64
+import threading
 import urllib
 
 import sys
+from sys import argv
 from Crypto.Cipher import AES
 from Crypto import Random
 import random
@@ -12,6 +14,8 @@ import time
 import json
 import pytesseract
 from PIL import Image, ImageDraw
+
+from userinfo import UserInfoService
 from yima import YIMA
 import re
 
@@ -98,12 +102,9 @@ class KTT(object):
 
         hi64 = hex(android_hash)
         lo64 = hex((device_hash << 32) & 0xffffffff | sim_hash)
-        # print("hi64: {}, lo64: {}".format(hi64, lo64))
         hi64 = StrUtil.convert_8_bytes(hi64)
         lo64 = StrUtil.convert_8_bytes(lo64)
-        # print("hi64: {}, lo64: {}".format(hi64, lo64))
-        # self.device_code = hi64 + lo64
-        self.device_code = "ffffffff7b844f0d0000000070677c1d"
+        self.device_code = hi64 + lo64
 
     @property
     def get_current_time(self):
@@ -112,91 +113,95 @@ class KTT(object):
         """
         return str(int(time.time()))
 
-    def daily_task(self, token=""):
+    def daily_task(self, token="", info=""):
         """
-            complete daily taskes
+            complete daily tasks
         :return: total_read
         """
         # 0. get cookie
-        # self.gen_device_code()
         self.get_api_start()
         self.token = token
         self.cookie += token
-        # 1. login
-        # time.sleep(3)
-        # self.post_login()
         # 2. get_user_info
         time.sleep(3)
         self.get_user_info()
 
-        print(self.user_info)
+        # print(self.user_info)
         # 3. get_task_center
-        print("task_status:")
+        # print("task_status:")
         time.sleep(3)
         task_center_status = self.post_task_center_status()
-        print("task_center_status")
-        print(task_center_status)
+        # print("task_center_status")
+        print("%s task status %s" % (info, task_center_status))
         if task_center_status["new_task_status"] == 0:
             # complete newer task
             time.sleep(3)
             task_status = self.get_task_status()
-            print(task_status["status"])
+            # print(task_status["status"])
             if task_status["status"][0] == 0:
                 time.sleep(3)
                 new_task_result = self.post_task_commit_new()
-                print("new_task_result:")
-                print(new_task_result)
-        # add master
-        # if task_center_status["invite_task_status"] == 0:
-        #    time.sleep(3)
-        #    self.post_task_commit_invite("20833")
+                print("%s new_task_result: %s" % (info, new_task_result))
         # 4. sign task
         # print("task sign")
         time.sleep(3)
         is_sign = self.get_sign_status()
         if is_sign == 0:
             time.sleep(3)
-            self.get_sign()
+            sign_coin = self.get_sign()
+            print("%s sign get coin: %s" % (info, sign_coin))
         # 5. packet task
-        print("packet")
+        # print("packet")
         time.sleep(3)
         count_down = self.get_timing_packet()
         # print("count_down: %d" % count_down)
         if count_down == 0:
             time.sleep(3)
             res_data = self.post_packet()
-            print("get coin: %s" % res_data["money"])
+            print("%s get coin: %s" % (info, res_data["money"]))
         # 6. get list
-        read_count = random.randint(5, 10)
+        read_count = random.randint(5, 7)
         total_read = 0
         while total_read < read_count:
-            time.sleep(3)
+            time.sleep(8)
             # get article list
             art_list_info = self.get_list()
             while art_list_info["total"] == 0:
-                time.sleep(3)
+                time.sleep(9)
                 art_list_info = self.get_list()
             art_list = art_list_info["list"]
-            for article in art_list:
+            for index, article in enumerate(art_list):
                 art_id = article["id"]
                 # 7. get content
+                time.sleep(9)
+                self.get_content(art_id)
                 time.sleep(3)
-                res_data = self.get_content(art_id)
-                time.sleep(1)
-                res_data = self.get_content_by_id(art_id)
+                self.get_content_by_id(art_id)
                 # 8. get reward
-                rand_int = random.randint(0, 100)
-                if rand_int % 2 == 0:
-                    print("get reward")
-                    time.sleep(3)
-                    res_data = self.get_article_reward(art_id)
-                    if res_data["c"] == 0:
-                        total_read += 1
-                        print("read an article")
-                        if total_read >= read_count:
-                            return total_read
-                    else:
+                # rand_int = random.randint(0, 100)
+                # if index % 2 == 0:
+                # print("get reward")
+                time.sleep(random.randint(60, 90))
+                res_data = self.get_article_reward(art_id)
+                if res_data["c"] == 0:
+                    total_read += 1
+                    print("%s total read: %s" % (info, total_read))
+                    if total_read >= read_count:
                         return total_read
+                    time.sleep(random.randint(60, 90))
+                elif res_data["c"] == -2050:
+                    print(res_data)
+                    time.sleep(random.randint(60, 90))
+                    continue
+                elif res_data["c"] == -2055:
+                    print(res_data)
+                    print(article)
+                    time.sleep(random.randint(60, 90))
+                    continue
+                else:
+                    print(res_data)
+                    print("get reward failure.")
+                    return total_read
         return total_read
 
     def get_api_start(self):
@@ -223,7 +228,9 @@ class KTT(object):
         url = url + "s=" + params_str
         headers = {
             "Accept-Language": "zh-CN,zh;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os +
+                          "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko)"
+                                                                           " Version/4.0 Mobile Safari/534.30",
             "Host": "api.applezhuan.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
@@ -262,7 +269,9 @@ class KTT(object):
         url = url + "s=" + params_str
         headers = {
             "Accept-Language": "zh-CN,zh;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30"
+                                              " (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
             "Host": "api.applezhuan.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
@@ -311,14 +320,16 @@ class KTT(object):
         }
         headers = {
             "Accept-Language": "zh-CN,zh;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/"
+                          + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                                "Version/4.0 Mobile Safari/534.30",
             "Host": "api.applezhuan.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
             "Cookie": self.cookie
         }
         res = requests.post(url, headers=headers, data=post_data)
-        print("device_code: %s" % self.device_code)
+        # print("device_code: %s" % self.device_code)
         # print(res.text)
         result = json.loads(res.text)
         self.token = result["d"]["token"]
@@ -339,7 +350,9 @@ class KTT(object):
             "Referer": "http://m.applezhuan.com/task_center.html",
             "Accept-Encoding": "gzip,deflate",
             "Accept-Language": "zh-CN,en-US;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Cookie": self.cookie,
             "X-Requested-With": "com.shuishi.kuai"
         }
@@ -363,15 +376,17 @@ class KTT(object):
             "Referer": "http://m.applezhuan.com/task_center.html",
             "Accept-Encoding": "gzip,deflate",
             "Accept-Language": "zh-CN,en-US;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Cookie": self.cookie,
             "X-Requested-With": "com.shuishi.kuai"
         }
 
         res = requests.get(url, headers=headers)
         result = json.loads(res.text)
-        print("get coin: %s" % result["d"]["coin"])
-        # return result["d"]["coin"]
+        # print("get coin: %s" % result["d"]["coin"])
+        return result["d"]["coin"]
 
     def get_timing_packet(self):
         """
@@ -388,7 +403,9 @@ class KTT(object):
             "Referer": "http://m.applezhuan.com/task_center.html",
             "Accept-Encoding": "gzip,deflate",
             "Accept-Language": "zh-CN,en-US;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Cookie": self.cookie,
             "X-Requested-With": "com.shuishi.kuai"
         }
@@ -413,7 +430,9 @@ class KTT(object):
             "Referer": "http://m.applezhuan.com/task_center.html",
             "Accept-Encoding": "gzip,deflate",
             "Accept-Language": "zh-CN,en-US;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Cookie": self.cookie,
             "X-Requested-With": "com.shuishi.kuai"
         }
@@ -453,7 +472,9 @@ class KTT(object):
         url = url + "s=" + params_str
         headers = {
             "Accept-Language": "zh-CN,zh;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Host": "api.applezhuan.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
@@ -485,7 +506,9 @@ class KTT(object):
         url = url + "s=" + params_str
         headers = {
             "Accept-Language": "zh-CN,zh;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Host": "api.applezhuan.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
@@ -540,7 +563,9 @@ class KTT(object):
         url = url + "s=" + params_str
         headers = {
             "Accept-Language": "zh-CN,zh;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Host": "api.applezhuan.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
@@ -585,7 +610,9 @@ class KTT(object):
 
         headers = {
             "Accept-Language": "zh-CN,zh;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Host": "api.applezhuan.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
@@ -593,16 +620,16 @@ class KTT(object):
         }
 
         res = requests.post(url, headers=headers, data=post_data)
-        print(res.text)
+        # print(res.text)
         result = json.loads(res.text)
-        uid = result["d"]["uid"]
+        # uid = result["d"]["uid"]
         self.token = result["d"]["token"]
         self.cookie += self.token
 
     def post_update_user_info(self):
         """
         update user info
-        :return: 
+        :return: the status_code of update 
         """
         url = "http://api.applezhuan.com/api/c/update_user_info"
         sexes = ["0", "1"]
@@ -623,7 +650,9 @@ class KTT(object):
         params_str = self.encrypt.get_secret_param(params)
         headers = {
             "Accept-Language": "zh-CN,zh;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Host": "api.applezhuan.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
@@ -634,8 +663,9 @@ class KTT(object):
             "s": params_str
         }
         res = requests.post(url, headers=headers, data=post_data)
-        print(res.text)
+        # print(res.text)
         result = json.loads(res.text)
+        return result["c"]
 
     def get_user_info(self):
         """ Get user info
@@ -663,7 +693,9 @@ class KTT(object):
         url = url + "s=" + params_str
         headers = {
             "Accept-Language": "zh-CN,zh;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Host": "api.applezhuan.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
@@ -697,7 +729,9 @@ class KTT(object):
             "Referer": "http://m.applezhuan.com/task_invite_num.html",
             "Accept-Encoding": "gzip,deflate",
             "Accept-Language": "zh-CN,en-US;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Cookie": self.cookie,
             "X-Requested-With": "com.shuishi.kuai"
         }
@@ -725,7 +759,9 @@ class KTT(object):
             "Referer": "http://m.applezhuan.com/task_new.html",
             "Accept-Encoding": "gzip,deflate",
             "Accept-Language": "zh-CN,en-US;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Cookie": self.cookie,
             "X-Requested-With": "com.shuishi.kuai"
         }
@@ -750,7 +786,9 @@ class KTT(object):
             "Referer": "http://m.applezhuan.com/task_invite_num.html",
             "Accept-Encoding": "gzip,deflate",
             "Accept-Language": "zh-CN,en-US;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Cookie": self.cookie,
             "X-Requested-With": "com.shuishi.kuai"
 
@@ -780,7 +818,9 @@ class KTT(object):
             "Referer": "http://m.applezhuan.com/task_center.html",
             "Accept-Encoding": "gzip,deflate",
             "Accept-Language": "zh-CN,en-US;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Cookie": self.cookie,
             "X-Requested-With": "com.shuishi.kuai"
         }
@@ -798,7 +838,7 @@ class KTT(object):
         """
         url = "http://api.applezhuan.com/api/c/getlist?&"
         cid = random.randint(0, len(self.channel_list) - 1)
-        print("channel: %s" % self.channel_list[cid])
+        print("channel: %s" % self.channel_list[cid]["name"])
         params = {
             "android_id": self.mobile.android_id,
             "platform": "2",
@@ -821,7 +861,9 @@ class KTT(object):
         url = url + "s=" + params_str
         headers = {
             "Accept-Language": "zh-CN,zh;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Host": "api.applezhuan.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
@@ -856,7 +898,9 @@ class KTT(object):
         url = url + "s=" + params_str
         headers = {
             "Accept-Language": "zh-CN,zh;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Host": "api.applezhuan.com",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
@@ -884,7 +928,9 @@ class KTT(object):
             "Referer": "http://m.applezhuan.com/article_detail.html?content_id=%s" % content_id,
             "Accept-Encoding": "gzip,deflate",
             "Accept-Language": "zh-CN,en-US;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Cookie": self.cookie,
             "X-Requested-With": "com.shuishi.kuai"
         }
@@ -910,7 +956,9 @@ class KTT(object):
             "Referer": "http://m.applezhuan.com/article_detail.html?content_id=%s" % content_id,
             "Accept-Encoding": "gzip,deflate",
             "Accept-Language": "zh-CN,en-US;q=0.8",
-            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" + self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+            "User-Agent": "Mozilla/5.0 (Linux; U; Android " + self.mobile.os + "; zh-cn; GT-N7100 Build/" +
+                          self.mobile.brand + ") AppleWebKit/534.30 (KHTML, like Gecko) "
+                                              "Version/4.0 Mobile Safari/534.30",
             "Cookie": self.cookie,
             "X-Requested-With": "com.shuishi.kuai"
         }
@@ -1083,7 +1131,6 @@ class Encrypt(object):
                 params_str str
         """
         params_str = urllib.urlencode(params)
-        # print("p_str: {}".format(params_str))
         return params_str
 
     def aes_encrypt(self, params_str):
@@ -1096,7 +1143,6 @@ class Encrypt(object):
         """
         params_str = pad(params_str)
         self.iv = Random.get_random_bytes(16)
-        # self.iv = str(bytearray([256-97, 66, 256-89, 91, 256-83, 79, 93, 70, 30, 256-69, 256-25, 256-57, 256-21, 40, 256-33, 256-9]))
         cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
         cipher_str = cipher.encrypt(params_str)
         return self.iv + cipher_str
@@ -1273,69 +1319,218 @@ class Decrypt(object):
         return urllib.unquote(params_str)
 
 
-def register_user():
+def register_user(father=0):
     reg = "(^1(33|53|77|8[019])[0-9]{8}$)|(^1700[0-9]{7}$)"
     reg1 = "(^1(3[0-2]|4[5]|5[56]|7[6]|8[56])[0-9]{8}$)|(^1709[0-9]{7}$)"
     reg2 = "(^1(3[4-9]|4[7]|5[0-27-9]|7[8]|8[2-478])[0-9]{8}$)|(^1705[0-9]{7}$)"
     yi_ma = YIMA("6381")
     yi_ma.login_yi_ma()
+    continue_flag = True
     # 1. get mobile
-    time.sleep(3)
-    mobile_num = yi_ma.get_mobile()
-    mobile = Mobile(mobile_num)
-    print("mobile: %s" % mobile_num)
-    if mobile_num and \
-            (re.match(reg, mobile_num) or re.match(reg1, mobile_num) or re.match(reg2, mobile_num)):
-        ktt = KTT(mobile)
-        ktt.gen_device_code()
-        ktt.get_api_start()
-        print("cookie: {}".format(ktt.cookie))
+    while continue_flag:
+        time.sleep(3)
+        mobile_num = yi_ma.get_mobile()
+        mobile = Mobile(mobile_num)
+        print("mobile: %s" % mobile_num)
+        if mobile_num and \
+                (re.match(reg, mobile_num) or re.match(reg1, mobile_num) or re.match(reg2, mobile_num)):
+            ktt = KTT(mobile)
+            ktt.gen_device_code()
+            ktt.get_api_start()
+            print("cookie: {}".format(ktt.cookie))
 
-        # get sms captcha
-        status = "-1113"
-        while status == "-1113":
-            img_captcha = None
-            while img_captcha is None:
-                img_ts, img_captcha = ktt.get_img_captcha()
-                print("img_ts: %s, img_captcha: %s" % (img_ts, img_captcha))
-                time.sleep(3)
-            result = ktt.get_sms_captcha(img_ts, img_captcha)
-            status = str(result["c"])
-            print("status: %s" % status)
-            if status == "-1113":
-                time.sleep(60)
+            # get sms captcha
+            status = "-1113"
+            while status == "-1113":
+                img_captcha = None
+                img_ts = None
+                while img_captcha is None:
+                    img_ts, img_captcha = ktt.get_img_captcha()
+                    print("img_ts: %s, img_captcha: %s" % (img_ts, img_captcha))
+                    time.sleep(3)
+                result = ktt.get_sms_captcha(img_ts, img_captcha)
+                status = str(result["c"])
+                print("status: %s" % status)
 
-        if status == "-2043":
-            print("exit mobile exists")
-            sys.exit(0)
-        if status == "0":
-            time.sleep(10)
-            sms_captcha = yi_ma.get_code()
-            print("sms_captcha: %s" % sms_captcha)
-            time.sleep(3)
-            ktt.post_register(sms_captcha)
-            time.sleep(3)
-            ktt.get_user_info()
-            # update user info
-            time.sleep(3)
-            ktt.post_update_user_info()
-            time.sleep(3)
-            ktt.get_user_info()
-            # add master
-            ktt.post_task_commit_invite("20833")
-            # todo add a user to user_info
-            # device_code, token, mac, mobile, os,
-            # brand, coin, father, is_notice, coin_income, income
-            # uid, balance, name
+                if status == "-1113":
+                    time.sleep(60)
 
+            if status == "-2043":
+                print("mobile has already registered")
+                continue_flag = True
+                continue
+                # sys.exit(0)
+            if status == "0":
+                time.sleep(10)
+                sms_captcha = yi_ma.get_code()
+                if sms_captcha:
+                    print("sms_captcha: %s" % sms_captcha)
+                    time.sleep(3)
+                    ktt.post_register(sms_captcha)
+                    print("token: %s" % ktt.token)
+                    time.sleep(3)
+                    ktt.get_user_info()
+                    # update user info
+                    time.sleep(3)
+                    ktt.post_update_user_info()
+                    time.sleep(3)
+                    ktt.get_user_info()
+                    time.sleep(3)
+                    # add master
+                    fathers = ["20833", "21102"]
+                    ktt.post_task_commit_invite(fathers[father])
+                    # uid(0), balance, name(1), mobile(2), father(3), balance(4), coin(5)
+                    # device_code(6), token(7), os(8), brand(9), mac(10), android_id(11)
+                    user_info = (
+                        ktt.user_info["uid"], ktt.user_info["name"], ktt.user_info["mobile"],
+                        ktt.user_info["father"], ktt.user_info["balance"], ktt.user_info["coin"],
+                        ktt.device_code, ktt.token, ktt.mobile.os, ktt.mobile.brand, ktt.mobile.mac,
+                        ktt.mobile.android_id
+                    )
+                    # save one user info record and one user flag
+                    uis.save([user_info])
+                    read_flag = [(user_info[0],)]
+                    uis.save_flag(read_flag)
+                    continue_flag = False
+                else:
+                    print("no get sms captcha")
+                    continue_flag = True
+            else:
+                print("no send sms captcha")
+                continue_flag = True
+        else:
+            print("mobile format error")
+            continue_flag = True
     yi_ma.release_all()
 
+
+def save_login(mobile):
+    """
+    login the mobile and save into database
+    :param mobile: mobile number
+    :return: 
+    """
+    mobile = Mobile(mobile)
+    ktt = KTT(mobile)
+    ktt.gen_device_code()
+    ktt.get_api_start()
+    time.sleep(4)
+    ktt.post_login()
+    time.sleep(4)
+    ktt.get_user_info()
+    user_info = (
+        ktt.user_info["uid"], ktt.user_info["name"], ktt.user_info["mobile"],
+        ktt.user_info["father"], ktt.user_info["balance"], ktt.user_info["coin"],
+        ktt.device_code, ktt.token, ktt.mobile.os, ktt.mobile.brand, ktt.mobile.mac,
+        ktt.mobile.android_id
+    )
+    print(user_info)
+
+    # save one user info record and one user flag
+    uis.save([user_info])
+    read_flag = [(user_info[0],)]
+    uis.save_flag(read_flag)
+
+
+def init_login():
+    """
+    init login and update the token in database
+    :return: 
+    """
+    print("init_login")
+    # get one user
+    user = uis.get_one_user()
+    print(user)
+    if user:
+        mobile = Mobile(user[2])
+        mobile.android_id = user[11]
+        mobile.mac = user[10]
+        mobile.brand = user[9]
+        mobile.os = user[8]
+        ktt = KTT(mobile)
+        ktt.device_code = user[6]
+        ktt.get_api_start()
+        time.sleep(5)
+        ktt.post_login()
+
+        # balance (string), coin (int), token (string), device_code(string), uid (int)
+        user_info = [(user[4], user[5], ktt.token, ktt.device_code, user[0])]
+        # update user info
+        print(user_info)
+        uis.update(user_info)
+
+
+class MyThread(threading.Thread):
+    """
+    My Thread
+    """
+    def __init__(self, name, iter_num):
+        threading.Thread.__init__(self)
+        self.name = "Thread-%s" % name
+        self.iter_num = iter_num
+
+    def run(self):
+        print("%s start ..." % self.name)
+        for i in range(self.iter_num):
+            info = "%s %s " % (self.name, "* "*(i+1))
+            print(info + " start")
+            # 1. get one user
+            user = []
+            if lock.acquire():
+                user = uis.get_one_user()
+                if user:
+                    read_flag = [(1, user[0])]
+                    uis.update_read_flag(read_flag)
+                lock.release()
+
+            if user:
+                mobile = Mobile(user[2])
+                mobile.android_id = user[11]
+                mobile.mac = user[10]
+                mobile.brand = user[9]
+                mobile.os = user[8]
+                ktt = KTT(mobile)
+                ktt.device_code = user[6]
+                # daily task
+                total_read = ktt.daily_task(user[7], info=info)
+                print("%s total read %s" % (info, total_read))
+                if lock.acquire():
+                    # add read record
+                    read_record = [(user[0], ktt.get_current_time, total_read)]
+                    uis.save_read_record(read_record)
+                    # update user flag
+                    read_flag = [(2, user[0])]
+                    uis.update_read_flag(read_flag)
+                    lock.release()
+
+
+lock = threading.Lock()
+uis = UserInfoService()
+
+
+def main_method(thread_num=1, iter_num=1):
+    thread_list = []
+    for i in range(thread_num):
+        t = MyThread(i, iter_num)
+        t.setDaemon(True)
+        thread_list.append(t)
+
+    for t in thread_list:
+        t.start()
+    for t in thread_list:
+        t.join()
+    print("all is over....")
+
 if "__main__" == __name__:
-    print("Hello Main!")
-    register_user()
-    # check_encrypt()
-    # test_decrypt_one()
-    # test_mobile()
-    # test_device_code()
-    # test_start()
-    # test_urllib()
+    # register_user()
+    # save_login("13941996570")
+    # init_login()
+
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "r":
+            invite_index = int(sys.argv[2])
+            register_user(invite_index)
+        elif argv[1].isdigit():
+            main_method(int(argv[1]), int(argv[2]))
+    else:
+        main_method()

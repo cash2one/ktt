@@ -1,3 +1,4 @@
+import re
 import sys
 
 from KuaiTT import Mobile, KTT, StrUtil, Encrypt, Decrypt
@@ -7,14 +8,14 @@ import pytesseract
 from PIL import Image, ImageDraw
 import time
 
-def test_device_code():
+def execute_device_code():
     mobile = Mobile()
     ktt = KTT(mobile)
     ktt.gen_device_code()
     print("device_code: {}".format(ktt.device_code))
 
 
-def test_start():
+def execute_start():
 
     yi_ma = YIMA("6381")
     yi_ma.login_yi_ma()
@@ -79,7 +80,7 @@ def test_start():
     # print("sms result: %s" % result)
 
 
-def test_orc():
+def execute_orc():
     for i in range(0, 20):
         image = Image.open("imgs/%d.png"% i)
         draw = ImageDraw.Draw(image)
@@ -94,7 +95,7 @@ def test_orc():
         print("%d code: %s"% (i,code))
 
 
-def test_show_default_channel_list():
+def execute_show_default_channel_list():
     c_list = [{u'id': 1, u'name': u'\u63a8\u8350'}, {u'id': 3, u'name': u'\u5a31\u4e50'}, {u'id': 5, u'name': u'\u641e\u7b11'}, {u'id': 6, u'name': u'\u7f8e\u5973'}, {u'id': 7, u'name': u'\u60c5\u611f'}, {u'id': 8, u'name': u'\u4f53\u80b2'}, {u'id': 9, u'name': u'\u8d22\u7ecf'}, {u'id': 10, u'name': u'\u6c7d\u8f66'}, {u'id': 11, u'name': u'\u7f8e\u98df'}, {u'id': 12, u'name': u'\u79d1\u6280'}, {u'id': 13, u'name': u'\u65f6\u5c1a'}, {u'id': 14, u'name': u'\u5065\u5eb7'}, {u'id': 15, u'name': u'\u623f\u4ea7'}, {u'id': 16, u'name': u'\u661f\u5ea7'}, {u'id': 17, u'name': u'\u80b2\u513f'}]
     print("*"*50)
     # print("id : {}, name: {}".format(c_list[0]["id"],c_list[0]["name"]))
@@ -105,7 +106,7 @@ def test_show_default_channel_list():
     print("*"*50)
 
 
-def test_show_guest_info():
+def execute_show_guest_info():
     """
     birth coin uid name mobile father headimg income balance  
     :return: 
@@ -117,13 +118,13 @@ def test_show_guest_info():
     for key, val in guest_info.items():
         print("key: %s value: %s"% (key, val))
 
-def test_mobile():
+def execute_mobile():
     mobile = Mobile()
     mobile.get_mobile_info()
     mobile.show()
 
 
-def test_encrypt():
+def execute_encrypt():
     params = {
         'name': 'g c ',
         "tel": "1248972395",
@@ -136,7 +137,7 @@ def test_encrypt():
 
 
 
-def test_decrypt():
+def execute_decrypt():
     decrypt = Decrypt()
     for key, value in urls.items():
         print("key: {}".format(key))
@@ -145,7 +146,7 @@ def test_decrypt():
         print("\n")
 
 
-def test_decrypt_one(key):
+def execute_decrypt_one(key):
     decrypt = Decrypt()
     # key = "start"
     print("key: {}".format(key))
@@ -156,7 +157,7 @@ def test_decrypt_one(key):
 
 
 def check_encrypt():
-    # secret_str = test_encrypt()
+    # secret_str = execute_encrypt()
     secret_str = "http://api.applezhuan.com/api/c/start?&s=n0KnW61PXUYeu%2BfH6yjf9wq30TMtcfkhCLN70CU1W" \
                  "%2B7r1RB87l8BLJUUNHLYw4me" \
                  "%2B7nQscGSDibpYoP9UXBYnKmiSYRM4C3trbde5F55yzGzIQ2AMv0L1L4EOxGac4FhzAlzdqwEj%2FCNVTWa" \
@@ -173,7 +174,7 @@ def check_encrypt():
     encrypt.get_secret_param({})
 
 
-def test_urllib():
+def execute_urllib():
     url_str = "n0KnW61PXUYeu%2BfH6yjf9wq30TMtcfkhCLN70CU1W%2B7r1RB87l8BLJUUNHLYw4me" \
               "%2B7nQscGSDibpYoP9UXBYnKmiSYRM4C3trbde5F55yzGzIQ2AMv0L1L4EOxGac4FhzAlzdqwEj%2FCNVTWa" \
               "%2BVeFrno6BpreWrMV7RLUOMa05qB4wXx3AixB%2FTHODUsv5sZ%2FUYYDDSk9CZLBLK%2Bw" \
@@ -258,7 +259,21 @@ urls = {
 }
 
 
-def test_run(mobile_num="17184084074"):
+def execute_reg():
+    reg = "(^1(33|53|77|8[019])[0-9]{8}$)|(^1700[0-9]{7}$)"
+    reg1 = "(^1(3[0-2]|4[5]|5[56]|7[6]|8[56])[0-9]{8}$)|(^1709[0-9]{7}$)"
+    reg2 = "(^1(3[4-9]|4[7]|5[0-27-9]|7[8]|8[2-478])[0-9]{8}$)|(^1705[0-9]{7}$)"
+    mobile_num = "13941996570"
+    # match_obj = re.match(reg, mobile_num)
+    # print((re.match(reg, mobile_num)
+    #        or re.match(reg1, mobile_num)
+    #        or re.match(reg2, mobile_num)))
+    if mobile_num and \
+            (re.match(reg, mobile_num) or re.match(reg1, mobile_num) or re.match(reg2, mobile_num)):
+        print("pass")
+
+
+def execute_run(mobile_num="17184084074"):
     # mobile_num =
     mobile = Mobile(mobile_num)
     ktt = KTT(mobile)
@@ -336,7 +351,8 @@ def test_run(mobile_num="17184084074"):
     print(res_data)
     print("hello")
 
-def test_update_user():
+
+def execute_update_user():
     token = "eyJhbGciOiJIUzI1NiIsImV4cCI6MTQ5MzU0MTE4NCwiaWF0IjoxNDkwOTQ5MTg0fQ.eyJpYXQiOjE0OTA5NDkxODQsInVpZCI6MjY0NjN9.RYKPgvX_3MDEBKqifLpG3bo7kLoTwy0G1DlceigfwtA"
     # session = ""
     # lon=0.0&time=1490976061&vn=1.0.2&mac=24:00:ba:75:3d:91&cid=1&content_type=1,3,4,5&av=2&
@@ -358,17 +374,18 @@ def test_update_user():
 
 
 def main():
-    # mobile_num = test_start()
-    # test_show_default_channel_list()
-    # test_decrypt_one("getlist2")
-    # test_decrypt_one("update_user")
+    # mobile_num = execute_start()
+    # execute_show_default_channel_list()
+    # execute_decrypt_one("getlist2")
+    # execute_decrypt_one("update_user")
     # print("mobile_num: %s" % mobile_num)
     # time.sleep(20)
     # if mobile_num:
-    test_run()
-    # test_show_guest_info()
-    # test_orc()
-    # test_update_user()
+    # execute_run()
+    # execute_show_guest_info()
+    # execute_orc()
+    # execute_update_user()
+    execute_reg()
 
 if "__main__" == __name__:
     main()
