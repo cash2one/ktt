@@ -81,16 +81,7 @@ class KTT(object):
         self.token = ""
         self.guest_info = {}
         self.user_info = {}
-        self.channel_list = [
-            {u'id': 1, u'name': u'\u63a8\u8350'}, {u'id': 3, u'name': u'\u5a31\u4e50'},
-            {u'id': 5, u'name': u'\u641e\u7b11'}, {u'id': 6, u'name': u'\u7f8e\u5973'},
-            {u'id': 7, u'name': u'\u60c5\u611f'}, {u'id': 8, u'name': u'\u4f53\u80b2'},
-            {u'id': 9, u'name': u'\u8d22\u7ecf'}, {u'id': 10, u'name': u'\u6c7d\u8f66'},
-            {u'id': 11, u'name': u'\u7f8e\u98df'}, {u'id': 12, u'name': u'\u79d1\u6280'},
-            {u'id': 13, u'name': u'\u65f6\u5c1a'}, {u'id': 14, u'name': u'\u5065\u5eb7'},
-            {u'id': 15, u'name': u'\u623f\u4ea7'}, {u'id': 16, u'name': u'\u661f\u5ea7'},
-            {u'id': 17, u'name': u'\u80b2\u513f'}
-        ]
+        self.chanel_ids = [1, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
 
     def gen_device_code(self):
         """
@@ -160,12 +151,14 @@ class KTT(object):
             res_data = self.post_packet()
             print("%s get coin: %s" % (info, res_data["money"]))
         # 6. get list
-        read_count = random.randint(5, 7)
+        # read_count = random.randint(5, 7)
+        read_count = random.randint(4, 5)
         total_read = 0
         while total_read < read_count:
             time.sleep(8)
             # get article list
             art_list_info = self.get_list()
+            print("total_count: %s" % art_list_info["total"])
             while art_list_info["total"] == 0:
                 time.sleep(9)
                 art_list_info = self.get_list()
@@ -178,9 +171,6 @@ class KTT(object):
                 time.sleep(3)
                 self.get_content_by_id(art_id)
                 # 8. get reward
-                # rand_int = random.randint(0, 100)
-                # if index % 2 == 0:
-                # print("get reward")
                 time.sleep(random.randint(60, 90))
                 res_data = self.get_article_reward(art_id)
                 if res_data["c"] == 0:
@@ -837,8 +827,9 @@ class KTT(object):
         :return: 
         """
         url = "http://api.applezhuan.com/api/c/getlist?&"
-        cid = random.randint(0, len(self.channel_list) - 1)
-        print("channel: %s" % self.channel_list[cid]["name"])
+        # cid = random.randint(0, len(self.channel_list) - 1)
+        cid = self.chanel_ids[random.randint(0, len(self.chanel_ids)-1)]
+        # print("channel: %s" % self.channel_list[cid]["name"])
         params = {
             "android_id": self.mobile.android_id,
             "platform": "2",
@@ -1470,7 +1461,7 @@ class MyThread(threading.Thread):
         self.iter_num = iter_num
 
     def run(self):
-        print("%s start ..." % self.name)
+        print("%s start ...\n" % self.name)
         for i in range(self.iter_num):
             info = "%s %s " % (self.name, "* "*(i+1))
             print(info + " start")

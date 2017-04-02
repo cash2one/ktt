@@ -308,16 +308,15 @@ def main():
             query_result = uis.get_user_read_count(user[0])
             print("Mobile: %s, Total_read: %s" % (user[2], query_result))
 
-        # for user in reading_user:
-        #     query_result = uis.get_user_read_count(user[0])
-        #     if query_result < 12:
-        #         uis.update_read_flag([(0, user[0])])
-        #     else:
-        #         uis.update_read_flag([(2, user[0])])
-        #     print(
-        #         "UID: {}, Name: {}, Mobile: {}, Father: {}, Balance: {}, Coin:{}".format(user[0], user[1], user[2],
-
-        #                                                                                user[3], user[4], user[5]))
+        for user in all_user:
+            query_result = uis.get_user_read_count(user[0])
+            if query_result < 9:
+                uis.update_read_flag([(0, user[0])])
+            else:
+                uis.update_read_flag([(2, user[0])])
+            # print(
+            #     "UID: {}, Name: {}, Mobile: {}, Father: {}, Balance: {}, Coin:{}".format(user[0], user[1], user[2],
+            #                                                                            user[3], user[4], user[5]))
 
 
 # def init_data_base():
