@@ -163,6 +163,7 @@ class KTT(object):
                 time.sleep(9)
                 art_list_info = self.get_list()
             art_list = art_list_info["list"]
+            
             for index, article in enumerate(art_list):
                 art_id = article["id"]
                 # 7. get content
@@ -827,9 +828,7 @@ class KTT(object):
         :return: 
         """
         url = "http://api.applezhuan.com/api/c/getlist?&"
-        # cid = random.randint(0, len(self.channel_list) - 1)
         cid = self.chanel_ids[random.randint(0, len(self.chanel_ids)-1)]
-        # print("channel: %s" % self.channel_list[cid]["name"])
         params = {
             "android_id": self.mobile.android_id,
             "platform": "2",

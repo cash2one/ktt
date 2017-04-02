@@ -1,0 +1,1 @@
+E:\win10\program\py27\python.exe KuaiTT.py %1 %2
