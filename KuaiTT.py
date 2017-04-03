@@ -104,7 +104,7 @@ class KTT(object):
         """
         return str(int(time.time()))
 
-    def daily_task(self, token="", info=""):
+    def daily_task(self, read_count, token="", info=""):
         """
             complete daily tasks
         :return: total_read
@@ -152,7 +152,7 @@ class KTT(object):
             print("%s get coin: %s" % (info, res_data["money"]))
         # 6. get list
         # read_count = random.randint(5, 7)
-        read_count = random.randint(4, 5)
+        # read_count = random.randint(3, 4)
         total_read = 0
         while total_read < read_count:
             time.sleep(8)
@@ -1486,9 +1486,17 @@ class MyThread(threading.Thread):
                 ktt = KTT(mobile)
                 ktt.device_code = user[6]
                 # daily task
+                read_count = 0
+                if lock.acquire():
+                    read_count = uis.get_user_read_count(user[0])
+                    lock.release()
+                if read_count == 0:
+                    read_count = random.randint(3, 4)
+                else:
+                    read_count = random.randint(7, 8) - read_count
                 total_read = 0
                 try:
-                    total_read = ktt.daily_task(user[7], info=info)
+                    total_read = ktt.daily_task(read_count, user[7], info=info)
                 except:
                     print("Exception, Sleep: {}".format(self.delay))
                     time.sleep(self.delay)
