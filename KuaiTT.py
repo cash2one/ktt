@@ -172,27 +172,30 @@ class KTT(object):
                 time.sleep(3)
                 self.get_content_by_id(art_id)
                 # 8. get reward
-                time.sleep(random.randint(60, 90))
-                res_data = self.get_article_reward(art_id)
-                if res_data["c"] == 0:
-                    total_read += 1
-                    print("%s total read: %s" % (info, total_read))
-                    if total_read >= read_count:
+                if random.randint(0,1) == 0:
+                    time.sleep(random.randint(60, 90))
+                    res_data = self.get_article_reward(art_id)
+                    if res_data["c"] == 0:
+                        total_read += 1
+                        print("%s total read: %s" % (info, total_read))
+                        if total_read >= read_count:
+                            return total_read
+                        time.sleep(random.randint(60, 90))
+                    elif res_data["c"] == -2050:
+                        print(res_data)
+                        time.sleep(random.randint(60, 90))
+                        continue
+                    elif res_data["c"] == -2055:
+                        print(res_data)
+                        print(article)
+                        time.sleep(random.randint(60, 90))
+                        continue
+                    else:
+                        print(res_data)
+                        print("get reward failure.")
                         return total_read
-                    time.sleep(random.randint(60, 90))
-                elif res_data["c"] == -2050:
-                    print(res_data)
-                    time.sleep(random.randint(60, 90))
-                    continue
-                elif res_data["c"] == -2055:
-                    print(res_data)
-                    print(article)
-                    time.sleep(random.randint(60, 90))
-                    continue
                 else:
-                    print(res_data)
-                    print("get reward failure.")
-                    return total_read
+                    time.sleep(10)
         return total_read
 
     def get_api_start(self):
