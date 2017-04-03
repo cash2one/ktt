@@ -307,10 +307,14 @@ def main():
         for user in already_user:
             query_result = uis.get_user_read_count(user[0])
             print("Mobile: %s, Total_read: %s" % (user[2], query_result))
+            if query_result < 8:
+                uis.update_read_flag([(0, user[0])])
+            else:
+                uis.update_read_flag([(2, user[0])])
 
         for user in all_user:
             query_result = uis.get_user_read_count(user[0])
-            if query_result < 9:
+            if query_result < 8:
                 uis.update_read_flag([(0, user[0])])
             else:
                 uis.update_read_flag([(2, user[0])])

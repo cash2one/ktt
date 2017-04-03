@@ -158,7 +158,7 @@ class KTT(object):
             time.sleep(8)
             # get article list
             art_list_info = self.get_list()
-            print("total_count: %s" % art_list_info["total"])
+            print("%s total_count: %s" % (info, art_list_info["total"]))
             while art_list_info["total"] == 0:
                 time.sleep(9)
                 art_list_info = self.get_list()
@@ -1458,9 +1458,10 @@ class MyThread(threading.Thread):
         threading.Thread.__init__(self)
         self.name = "Thread-%s" % name
         self.iter_num = iter_num
+        self.delay = 8
 
     def run(self):
-        print("%s start ...\n" % self.name)
+        print("%s start ..." % self.name)
         for i in range(self.iter_num):
             info = "%s %s " % (self.name, "* "*(i+1))
             print(info + " start")
@@ -1482,16 +1483,23 @@ class MyThread(threading.Thread):
                 ktt = KTT(mobile)
                 ktt.device_code = user[6]
                 # daily task
-                total_read = ktt.daily_task(user[7], info=info)
-                print("%s total read %s" % (info, total_read))
-                if lock.acquire():
-                    # add read record
-                    read_record = [(user[0], ktt.get_current_time, total_read)]
-                    uis.save_read_record(read_record)
-                    # update user flag
-                    read_flag = [(2, user[0])]
-                    uis.update_read_flag(read_flag)
-                    lock.release()
+                total_read = 0
+                try:
+                    total_read = ktt.daily_task(user[7], info=info)
+                except:
+                    print("Exception, Sleep: {}".format(self.delay))
+                    time.sleep(self.delay)
+                    self.delay *= 2
+                else:
+                    print("%s read over, total read %s" % (info, total_read))
+                    if lock.acquire():
+                        # add read record
+                        read_record = [(user[0], ktt.get_current_time, total_read)]
+                        uis.save_read_record(read_record)
+                        # update user flag
+                        read_flag = [(2, user[0])]
+                        uis.update_read_flag(read_flag)
+                        lock.release()
 
 
 lock = threading.Lock()
@@ -1507,6 +1515,7 @@ def main_method(thread_num=1, iter_num=1):
 
     for t in thread_list:
         t.start()
+        time.sleep(10)
     for t in thread_list:
         t.join()
     print("all is over....")
