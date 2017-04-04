@@ -300,7 +300,7 @@ def main():
         all_user_num = len(all_user)
         already_user_num = len(already_user)
         print("Total User Count: {}".format(all_user_num))
-        print("Done: %d Rate: %.3f" % (all_user_num, (already_user_num / float(all_user_num))))
+        print("Done: %d Rate: %.3f" % (already_user_num, (already_user_num / float(all_user_num))))
         print("Undone: {}".format(len(not_user)))
         print("Doing: {}".format(len(reading_user)))
 
