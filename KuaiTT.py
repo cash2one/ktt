@@ -1491,9 +1491,9 @@ class MyThread(threading.Thread):
                     read_count = uis.get_user_read_count(user[0])
                     lock.release()
                 if read_count == 0:
-                    read_count = random.randint(3, 4)
-                else:
-                    read_count = random.randint(7, 8) - read_count
+                    read_count = random.randint(5, 7)
+                # else:
+                #    read_count = random.randint(7, 8) - read_count
                 total_read = 0
                 try:
                     total_read = ktt.daily_task(read_count, user[7], info=info)
