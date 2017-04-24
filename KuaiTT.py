@@ -1432,25 +1432,27 @@ def init_login():
     """
     print("init_login")
     # get one user
-    user = uis.get_one_user()
-    print(user)
-    if user:
-        mobile = Mobile(user[2])
-        mobile.android_id = user[11]
-        mobile.mac = user[10]
-        mobile.brand = user[9]
-        mobile.os = user[8]
-        ktt = KTT(mobile)
-        ktt.device_code = user[6]
-        ktt.get_api_start()
-        time.sleep(5)
-        ktt.post_login()
+    users = uis.get_all()
+    # print(user)
+    for user in users:
+        if user:
+            mobile = Mobile(user[2])
+            mobile.android_id = user[11]
+            mobile.mac = user[10]
+            mobile.brand = user[9]
+            mobile.os = user[8]
+            ktt = KTT(mobile)
+            ktt.device_code = user[6]
+            ktt.get_api_start()
+            time.sleep(5)
+            ktt.post_login()
 
-        # balance (string), coin (int), token (string), device_code(string), uid (int)
-        user_info = [(user[4], user[5], ktt.token, ktt.device_code, user[0])]
-        # update user info
-        print(user_info)
-        uis.update(user_info)
+            # balance (string), coin (int), token (string), device_code(string), uid (int)
+            user_info = [(user[4], user[5], ktt.token, ktt.device_code, user[0])]
+            # update user info
+            print(user_info)
+            uis.update(user_info)
+            time.sleep(10)
 
 
 class MyThread(threading.Thread):
@@ -1540,6 +1542,8 @@ if "__main__" == __name__:
         if sys.argv[1] == "r":
             invite_index = int(sys.argv[2])
             register_user(invite_index)
+        elif sys.argv[1] == "i":
+            init_login()
         elif argv[1].isdigit():
             main_method(int(argv[1]), int(argv[2]))
     else:
